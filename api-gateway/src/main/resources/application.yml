@@ -10,7 +10,6 @@ spring:
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
       routes:
-        # user micro service
         - id: user-service
           uri: http://localhost:8081
           predicates:
@@ -22,7 +21,6 @@ spring:
                 redis-rate-limiter.burstCapacity: 20
                 redis-rate-limiter.requestedToken: 1
 
-        #Transaction microservice
         - id: transaction-service
           uri: http://localhost:8082
           predicates:
@@ -34,9 +32,8 @@ spring:
                 redis-rate-limiter.burstCapacity: 20
                 redis-rate-limiter.requestedToken: 1
 
-        #Reward microservice
         - id: reward-service
-          uri: http://localhost:8085
+          uri: http://localhost:8089
           predicates:
             - Path=/api/rewards/**
           filters:
@@ -46,11 +43,21 @@ spring:
                 redis-rate-limiter.burstCapacity: 20
                 redis-rate-limiter.requestedToken: 1
 
-        #Notification microservice
         - id: notification-service
           uri: http://localhost:8084
           predicates:
             - Path=/api/notifications/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedToken: 1
+
+        - id: wallet-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/wallets/**
           filters:
             - name: RequestRateLimiter
               args:

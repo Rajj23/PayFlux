@@ -5,6 +5,7 @@ import com.paypal.user_service.dto.LoginRequest;
 import com.paypal.user_service.dto.SignupRequest;
 import com.paypal.user_service.entity.User;
 import com.paypal.user_service.repository.UserRepository;
+import com.paypal.user_service.service.UserService;
 import com.paypal.user_service.util.JWTUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.swing.text.html.Option;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -25,18 +25,21 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JWTUtil jwtUtil;
+    private final UserService userService;
 
-    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, JWTUtil jwtUtil) {
+    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, JWTUtil jwtUtil, UserService userService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.userService = userService;
     }
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest request){
-        Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
-        if(existingUser.isPresent()){
-            return ResponseEntity.badRequest().body("User already exists");
+        if(userRepository.findByEmail(request.getEmail()).isPresent()){
+            return ResponseEntity
+                    .badRequest()
+                    .body("User Already Exists");
         }
 
         User user = new User();
@@ -44,11 +47,10 @@ public class AuthController {
         user.setEmail(request.getEmail());
         user.setRole("ROLE_USER");
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        userRepository.save(user);
 
-        User savedUser = userRepository.save(user);
+        User savedUser = userService.createUser(user);
 
-        return ResponseEntity.ok("User registered successfully");
+        return ResponseEntity.ok("User registered successfully" + savedUser.getId());
     }
 
     @PostMapping("/login")

@@ -1,14 +1,7 @@
 package com.paypal.notification_service.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.Positive;
-
 import java.time.LocalDateTime;
 
-
-
-//@JsonIgnoreProperties(ignoreUnknown = true)
 public class Transaction {
     private Long id;
     private Long senderId;
@@ -19,7 +12,6 @@ public class Transaction {
 
     public Transaction() {}
 
-    // Getters and setters
     public Long getId() {
         return id;
     }
@@ -45,11 +37,11 @@ public class Transaction {
         this.amount = amount;
     }
 
-    public LocalDateTime getTimestamp() {
+    public LocalDateTime getTimeStamp() {
         return timeStamp;
     }
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timeStamp = timestamp;
+    public void setTimeStamp(LocalDateTime timeStamp) {
+        this.timeStamp = timeStamp;
     }
 
     public String getStatus() {
