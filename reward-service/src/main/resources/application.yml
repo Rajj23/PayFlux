@@ -6,10 +6,10 @@ spring:
     name: reward-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/payflux
+    url: ${DB_URL}
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: '1234'
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
   h2:
     console:
