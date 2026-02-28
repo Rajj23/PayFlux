@@ -1,0 +1,28 @@
+package com.payflux.notification_service.controller;
+
+import com.payflux.notification_service.entity.Notification;
+import com.payflux.notification_service.service.NotificationService;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/notifications")
+public class NotificationController {
+
+    private NotificationService notificationService;
+
+    public NotificationController(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
+    @PostMapping
+    public Notification sendNotification(@RequestBody Notification notification){
+        return notificationService.sendNotification(notification);
+    }
+
+    @GetMapping("/{userId}")
+    public List<Notification> getNotificationsByUser(@PathVariable Long userId) {
+        return notificationService.getNotificationByUserId(userId);
+    }
+}

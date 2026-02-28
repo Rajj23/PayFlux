@@ -2,11 +2,14 @@ server:
   port: 8084
 
 spring:
+  application:
+    name: notification-service
+
   datasource:
-    url: jdbc:h2:mem:notificationDb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://localhost:5432/payflux
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: '1234'
 
   h2:
     console:
@@ -16,7 +19,7 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   kafka:
     bootstrap-servers: localhost:9092
@@ -30,5 +33,5 @@ spring:
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.add.type.headers: false
-        spring.json.trusted.packages: "com.paypal.notification_service.entity,com.paypal.transaction_service.entity"
-        spring.json.value.default.type: com.paypal.notification_service.entity.Transaction
+        spring.json.trusted.packages: "com.payflux.notification_service.entity,com.payflux.transaction_service.entity"
+        spring.json.value.default.type: com.payflux.notification_service.entity.Transaction

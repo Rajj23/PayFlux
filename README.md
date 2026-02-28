@@ -1,6 +1,6 @@
 <div align="center">
 
-# 💳 PayPal Clone
+# 💳 PayFlux
 
 **A microservices-based payment system built with Spring Boot & Kafka**
 
@@ -14,8 +14,7 @@
 
 ---
 
-<!-- Replace the URL below with an actual demo recording if available -->
-<!-- ![Demo](https://raw.githubusercontent.com/YOUR_USER/Paypal-Clone/main/demo.gif) -->
+
 
 ## Quickstart
 

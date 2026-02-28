@@ -8,7 +8,7 @@
 		<version>3.5.0</version>
 		<relativePath/>
 	</parent>
-	<groupId>com.paypal</groupId>
+	<groupId>com.payflux</groupId>
 	<artifactId>api-gateway</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>api-gateway</name>
@@ -76,12 +76,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-api</artifactId>
-			<version>0.11.5</version>
-			<scope>compile</scope>
 		</dependency>
 
 		<dependency>
