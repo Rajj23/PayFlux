@@ -57,14 +57,14 @@ GET  /api/rewards/user/{userId}
 
 ### Services & Ports
 
-| Service | Port | Role |
-|---------|------|------|
+| Service | Port   | Role |
+|---------|--------|------|
 | API Gateway | `8080` | Routing, JWT validation, rate limiting |
 | User Service | `8081` | Signup, login, JWT issuance |
 | Transaction Service | `8082` | Money transfers, Kafka producer |
 | Wallet Service | `8083` | Balances, holds, debit/credit |
 | Notification Service | `8084` | Kafka consumer — stores notifications |
-| Reward Service | `8089` | Kafka consumer — assigns reward points |
+| Reward Service | `8085` | Kafka consumer — assigns reward points |
 | Kafka | `9092` | Event broker (Docker) |
 | Zookeeper | `2181` | Kafka coordination (Docker) |
 
@@ -89,17 +89,17 @@ Client ──▶ API Gateway (8080)
                ├── /api/transactions/** ──▶ Transaction Service (8082)
                ├── /api/v1/wallets/**  ──▶ Wallet Service (8083)
                ├── /api/notifications/**──▶ Notification Service (8084)
-               └── /api/rewards/**     ──▶ Reward Service (8089)
+               └── /api/rewards/**     ──▶ Reward Service (8085)
 
 User Service ──[Feign]──▶ Wallet Service        (auto-create wallet on signup)
 Transaction Service ──[REST]──▶ Wallet Service   (debit/credit on transfer)
 Transaction Service ──[Kafka: txn-initiated]──▶ Notification + Reward Services
 ```
 
-### ER Diagram
+### System Architecture Diagram
 
-![ER Diagram](Er-Diagram.png)
 
+![PayFlux](PayFlux.png)
 ---
 
 ## Running the System
