@@ -29,6 +29,11 @@ public class Transaction {
     @Column(nullable = false)
     private String status;
 
+    @Column(unique = true)
+    private String idempotencyKey;
+
+    private String holdReference;
+
     public Transaction(Long senderId, Long id, Long receiverId, Double amount, LocalDateTime timeStamp, String status) {
         this.senderId = senderId;
         this.id = id;
@@ -88,6 +93,22 @@ public class Transaction {
 
     public void setReceiverId(Long receiverId) {
         this.receiverId = receiverId;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
+    }
+
+    public String getHoldReference() {
+        return holdReference;
+    }
+
+    public void setHoldReference(String holdReference) {
+        this.holdReference = holdReference;
     }
 
     @PrePersist

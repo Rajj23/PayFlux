@@ -1,2 +1,58 @@
 # Environment config (contains credentials)
 set-env.bat
+.env
+
+# SSH keys and generated server deployment secrets.
+*.pem
+*.key
+deploy/.ssh/
+deploy/server.env
+deploy/server-config.tfvars
+deploy/payflux-server.pem
+terraform/server/*.tfstate
+terraform/server/*.tfstate.backup
+terraform/server/.terraform/
+terraform/server/.terraform.lock.hcl
+terraform/server/*.auto.tfvars
+terraform/server/*.tfplan
+
+
+# Secrets
+.env
+*.env
+!.env.example
+*.pem
+*.key
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfplan
+*.zip
+
+# Logs and test output
+*.log
+test_output.txt
+
+# Java / Maven
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Frontend
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# OS
+.DS_Store
+Thumbs.db

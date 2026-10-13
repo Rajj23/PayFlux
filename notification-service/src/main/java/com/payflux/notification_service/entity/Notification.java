@@ -18,6 +18,8 @@ public class Notification {
 
     private LocalDateTime sentAt;
 
+    private Long transactionId;
+
     public Notification(Long id, LocalDateTime sentAt, String message, Long userId) {
         this.id = id;
         this.sentAt = sentAt;
@@ -59,5 +61,13 @@ public class Notification {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public Long getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(Long transactionId) {
+        this.transactionId = transactionId;
     }
 }

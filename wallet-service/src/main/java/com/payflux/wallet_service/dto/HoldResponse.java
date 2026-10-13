@@ -5,6 +5,8 @@ public class HoldResponse {
     private Long amount;
     private String status;
 
+    public HoldResponse() {}
+
     public HoldResponse(String holdReference, Long amount, String status) {
         this.holdReference = holdReference;
         this.amount = amount;

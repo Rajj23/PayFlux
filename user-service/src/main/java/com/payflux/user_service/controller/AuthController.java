@@ -36,35 +36,44 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest request){
-        if(userRepository.findByEmail(request.getEmail()).isPresent()){
-            return ResponseEntity
-                    .badRequest()
-                    .body("User Already Exists");
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        if(userRepository.findByEmail(email).isPresent()){
+            Map<String, String> err = new HashMap<>();
+            err.put("message", "User already exists with this email");
+            return ResponseEntity.badRequest().body(err);
         }
 
         User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setName(request.getName() != null ? request.getName().trim() : "");
+        user.setEmail(email);
         user.setRole("ROLE_USER");
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
         User savedUser = userService.createUser(user);
 
-        return ResponseEntity.ok("User registered successfully" + savedUser.getId());
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("message", "User registered successfully");
+        resp.put("userId", savedUser.getId());
+        return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request){
-        Optional<User> userOpt = userRepository.findByEmail(request.getEmail());
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        Optional<User> userOpt = userRepository.findByEmail(email);
 
         if(userOpt.isEmpty()){
-            return ResponseEntity.status(401).body("User not found");
+            Map<String, String> err = new HashMap<>();
+            err.put("message", "User not found. Please check your email or create an account.");
+            return ResponseEntity.status(401).body(err);
         }
 
         User user = userOpt.get();
 
         if(!passwordEncoder.matches(request.getPassword(),user.getPassword())){
-            return ResponseEntity.status(401).body("Invalid credentials");
+            Map<String, String> err = new HashMap<>();
+            err.put("message", "Invalid credentials. Please check your password.");
+            return ResponseEntity.status(401).body(err);
         }
 
         Map<String, Object> claims = new HashMap<>();
@@ -73,7 +82,14 @@ public class AuthController {
 
         String token = jwtUtil.generateToken(claims, user.getEmail());
 
-        return ResponseEntity.ok(new JwtResponse(token));
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("token", token);
+        Map<String, Object> userInfo = new HashMap<>();
+        userInfo.put("id", user.getId());
+        userInfo.put("name", user.getName());
+        userInfo.put("email", user.getEmail());
+        resp.put("user", userInfo);
 
+        return ResponseEntity.ok(resp);
     }
 }

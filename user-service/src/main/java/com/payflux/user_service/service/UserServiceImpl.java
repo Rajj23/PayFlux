@@ -2,12 +2,14 @@ package com.payflux.user_service.service;
 
 import com.payflux.user_service.client.WalletClient;
 import com.payflux.user_service.dto.CreateWalletRequest;
+import com.payflux.user_service.dto.UserDTO;
 import com.payflux.user_service.entity.User;
 import com.payflux.user_service.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService{
@@ -46,4 +48,26 @@ public class UserServiceImpl implements UserService{
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
+
+    @Override
+    public List<UserDTO> searchUsers(String query) {
+        return userRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query)
+                .stream()
+                .map(user -> new UserDTO(user.getId(), user.getName(), user.getEmail()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<User> updateUser(Long id, User updatedUser) {
+        return userRepository.findById(id).map(existing -> {
+            if (updatedUser.getName() != null && !updatedUser.getName().isBlank()) {
+                existing.setName(updatedUser.getName());
+            }
+            if (updatedUser.getEmail() != null && !updatedUser.getEmail().isBlank()) {
+                existing.setEmail(updatedUser.getEmail());
+            }
+            return userRepository.save(existing);
+        });
+    }
 }
+

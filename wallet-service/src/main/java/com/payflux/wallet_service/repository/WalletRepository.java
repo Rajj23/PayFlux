@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface WalletRepository extends JpaRepository<Wallet, Long> {
@@ -15,5 +16,8 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Wallet> findByUserIdAndCurrency(Long userId,String currency);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Wallet> findByUserIdInAndCurrencyOrderByUserIdAsc(List<Long> userIds, String currency);
 
 }

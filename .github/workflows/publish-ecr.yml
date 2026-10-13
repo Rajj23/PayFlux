@@ -1,0 +1,250 @@
+name: Build and publish service images
+
+"on":
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-ecr-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.filter.outputs.matrix }}
+      has_changes: ${{ steps.filter.outputs.has_changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select changed services
+        id: filter
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          services='[
+            {"path":"api-gateway","repository":"payflux-api-gateway","kind":"maven"},
+            {"path":"user-service","repository":"payflux-user-service","kind":"maven"},
+            {"path":"wallet-service","repository":"payflux-wallet-service","kind":"maven"},
+            {"path":"transaction-service","repository":"payflux-transaction-service","kind":"maven"},
+            {"path":"notification-service","repository":"payflux-notification-service","kind":"maven"},
+            {"path":"reward-service","repository":"payflux-reward-service","kind":"maven"},
+            {"path":"fronted_new","repository":"payflux-frontend","kind":"frontend"}
+          ]'
+
+          # A first push has no usable base; build all images.
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            changed_paths=$(printf '%s\n' api-gateway user-service wallet-service transaction-service notification-service reward-service fronted_new)
+          else
+            changed_paths=$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")
+            if grep -Fxq 'pom.xml' <<< "$changed_paths"; then
+              changed_paths+=$'\napi-gateway/pom.xml\nuser-service/pom.xml\nwallet-service/pom.xml\ntransaction-service/pom.xml\nnotification-service/pom.xml\nreward-service/pom.xml'
+            fi
+          fi
+
+          matrix=$(jq -cn --argjson services "$services" --arg paths "$changed_paths" '
+            [$services[] | select(.path as $path | $paths | split("\n") | any(startswith($path + "/")))]
+          ')
+          # Every deployment uses the current commit SHA for all image tags.
+          # Configuration/workflow-only deployments therefore also publish the
+          # complete image set instead of referencing nonexistent SHA tags.
+          deploy_changed=false
+          if grep -Eq '^(k8s/|\.github/workflows/publish-ecr\.yml$)' <<< "$changed_paths"; then
+            deploy_changed=true
+          fi
+
+          if [[ "$matrix" == "[]" && "$deploy_changed" == "false" ]]; then
+            echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            # The applied Kustomize bundle pins every workload to this commit's
+            # SHA; ensure every referenced repository has that tag.
+            matrix=$(jq -cn --argjson services "$services" '$services')
+            echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-push:
+    name: Build and push ${{ matrix.path }}
+    needs: changes
+    if: needs.changes.outputs.has_changes == 'true' && needs.changes.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: payflux
+          POSTGRES_USER: payflux
+          POSTGRES_PASSWORD: payflux
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U payflux -d payflux"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      kafka:
+        image: apache/kafka:4.3.1
+        ports:
+          - 9092:9092
+        env:
+          CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+          KAFKA_NODE_ID: 1
+          KAFKA_PROCESS_ROLES: broker,controller
+          KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+          KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+          KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.changes.outputs.matrix) }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-east-1
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        if: matrix.kind == 'maven'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Test Maven service
+        if: matrix.kind == 'maven'
+        working-directory: ${{ matrix.path }}
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/payflux
+          DB_USERNAME: payflux
+          DB_PASSWORD: payflux
+          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          WALLET_SERVICE_URL: http://localhost:8083
+          USER_SERVICE_URL: http://localhost:8081
+          TRANSACTION_SERVICE_URL: http://localhost:8082
+          NOTIFICATION_SERVICE_URL: http://localhost:8084
+          REWARD_SERVICE_URL: http://localhost:8089
+          REDIS_HOST: localhost
+          REDIS_PORT: '6379'
+          FRONTEND_URL: http://localhost:3000
+          JWT_SECRET: ci-only-secret-key-that-is-at-least-32-bytes-long
+        run: mvn --batch-mode --no-transfer-progress clean verify
+
+      - name: Set up Node.js
+        if: matrix.kind == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: fronted_new/package-lock.json
+
+      - name: Build frontend
+        if: matrix.kind == 'frontend'
+        working-directory: fronted_new
+        env:
+          API_INTERNAL_URL: ${{ vars.API_INTERNAL_URL }}
+        run: |
+          test -n "$API_INTERNAL_URL" || { echo "Set the API_INTERNAL_URL GitHub variable to the backend URL used by the frontend build." >&2; exit 1; }
+          npm ci
+          npm run build
+
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.path }}
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ matrix.repository }}:${{ env.IMAGE_TAG }}
+          build-args: |
+            API_INTERNAL_URL=${{ vars.API_INTERNAL_URL }}
+
+  deploy:
+    name: Deploy to EKS
+    needs: [changes, build-and-push]
+    if: >-
+      github.event_name != 'workflow_dispatch' && always() && needs.changes.outputs.has_changes == 'true' &&
+      (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-east-1
+      EKS_CLUSTER_NAME: payflux-cluster
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+
+      - name: Apply manifests with this commit's image tags
+        run: |
+          set -euo pipefail
+          manifest_dir=$(mktemp -d)
+          trap 'rm -rf "$manifest_dir"' EXIT
+          cp -R ./k8s/. "$manifest_dir/"
+          # Keep the operator-configured runtime endpoints in the live ConfigMap.
+          # Bootstrap config.yaml and payflux-secrets once before the first deploy.
+          sed -i -E '/^[[:space:]]*-[[:space:]]*config[.]yaml[[:space:]]*$/d; /^[[:space:]]*-[[:space:]]*namespace[.]yaml[[:space:]]*$/d; s/newTag: demo/newTag: '"$IMAGE_TAG"'/g' "$manifest_dir/kustomization.yaml"
+          kubectl apply -k "$manifest_dir"
+
+      - name: Wait for application rollouts
+        run: |
+          set -euo pipefail
+          for deployment in api-gateway frontend user-service wallet-service transaction-service notification-service reward-service; do
+            kubectl rollout status "deployment/${deployment}" --namespace payflux --timeout=10m
+          done

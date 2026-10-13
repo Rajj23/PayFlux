@@ -1,0 +1,177 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-gateway
+  namespace: payflux
+  labels:
+    release: monitoring
+    app.kubernetes.io/part-of: payflux
+spec:
+  namespaceSelector:
+    matchNames:
+      - payflux
+  selector:
+    matchLabels:
+      app: api-gateway
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+  podTargetLabels:
+    - app
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: user-service
+  namespace: payflux
+  labels:
+    release: monitoring
+    app.kubernetes.io/part-of: payflux
+spec:
+  namespaceSelector:
+    matchNames:
+      - payflux
+  selector:
+    matchLabels:
+      app: user-service
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+  podTargetLabels:
+    - app
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: transaction-service
+  namespace: payflux
+  labels:
+    release: monitoring
+    app.kubernetes.io/part-of: payflux
+spec:
+  namespaceSelector:
+    matchNames:
+      - payflux
+  selector:
+    matchLabels:
+      app: transaction-service
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+  podTargetLabels:
+    - app
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: wallet-service
+  namespace: payflux
+  labels:
+    release: monitoring
+    app.kubernetes.io/part-of: payflux
+spec:
+  namespaceSelector:
+    matchNames:
+      - payflux
+  selector:
+    matchLabels:
+      app: wallet-service
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+  podTargetLabels:
+    - app
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notification-service
+  namespace: payflux
+  labels:
+    release: monitoring
+    app.kubernetes.io/part-of: payflux
+spec:
+  namespaceSelector:
+    matchNames:
+      - payflux
+  selector:
+    matchLabels:
+      app: notification-service
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+  podTargetLabels:
+    - app
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: reward-service
+  namespace: payflux
+  labels:
+    release: monitoring
+    app.kubernetes.io/part-of: payflux
+spec:
+  namespaceSelector:
+    matchNames:
+      - payflux
+  selector:
+    matchLabels:
+      app: reward-service
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+  podTargetLabels:
+    - app
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payflux-overview-dashboard
+  namespace: payflux
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: payflux
+data:
+  payflux-overview.json: |-
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "panels": [
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"reqps"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":0},"id":1,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"sum by (app) (rate(http_server_requests_seconds_count{app=~\"api-gateway|user-service|transaction-service|wallet-service|notification-service|reward-service\",uri!~\"UNKNOWN|/actuator.*\"}[5m]))","legendFormat":"{{app}}","refId":"A"}],"title":"Request rate by service","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"s"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":12,"y":0},"id":2,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"histogram_quantile(0.95, sum by (le, app) (rate(http_server_requests_seconds_bucket{app=~\"api-gateway|user-service|transaction-service|wallet-service|notification-service|reward-service\",uri!~\"UNKNOWN|/actuator.*\"}[5m])))","legendFormat":"{{app}} p95","refId":"A"}],"title":"HTTP p95 latency","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"percent","min":0,"max":100},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":8},"id":3,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"100 * sum by (app) (rate(http_server_requests_seconds_count{app=~\"api-gateway|user-service|transaction-service|wallet-service|notification-service|reward-service\",status=~\"5..\",uri!~\"UNKNOWN|/actuator.*\"}[5m])) / clamp_min(sum by (app) (rate(http_server_requests_seconds_count{app=~\"api-gateway|user-service|transaction-service|wallet-service|notification-service|reward-service\",uri!~\"UNKNOWN|/actuator.*\"}[5m])), 1e-9)","legendFormat":"{{app}}","refId":"A"}],"title":"HTTP 5xx error rate","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"bytes"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":12,"y":8},"id":4,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"sum by (app) (jvm_memory_used_bytes{area=\"heap\",app=~\"api-gateway|user-service|transaction-service|wallet-service|notification-service|reward-service\"})","legendFormat":"{{app}} used","refId":"A"},{"expr":"sum by (app) (jvm_memory_max_bytes{area=\"heap\",app=~\"api-gateway|user-service|transaction-service|wallet-service|notification-service|reward-service\"})","legendFormat":"{{app}} max","refId":"B"}],"title":"JVM heap used / max","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"percentunit","min":0},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":16},"id":5,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=\"payflux\",container!~\"POD|\",image!=\"\"}[5m]))","legendFormat":"{{pod}}","refId":"A"}],"title":"Pod CPU usage","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"bytes"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":12,"y":16},"id":6,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"sum by (namespace, pod) (container_memory_working_set_bytes{namespace=\"payflux\",container!~\"POD|\",image!=\"\"})","legendFormat":"{{pod}}","refId":"A"}],"title":"Pod memory working set","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"short"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":0,"y":24},"id":7,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"sum by (namespace, pod) (kube_pod_container_status_restarts_total{namespace=\"payflux\"})","legendFormat":"{{pod}}","refId":"A"}],"title":"Container restarts","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"short"},"overrides":[]},"gridPos":{"h":8,"w":12,"x":12,"y":24},"id":8,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"sum by (deployment) (kube_deployment_spec_replicas{namespace=\"payflux\"})","legendFormat":"{{deployment}} desired","refId":"A"},{"expr":"sum by (deployment) (kube_deployment_status_replicas_available{namespace=\"payflux\"})","legendFormat":"{{deployment}} available","refId":"B"},{"expr":"sum by (app) (rate(http_server_requests_seconds_count{app=~\"api-gateway|user-service|transaction-service|wallet-service|notification-service|reward-service\",uri!~\"UNKNOWN|/actuator.*\"}[5m]))","legendFormat":"{{app}} req/s","refId":"C"}],"title":"Replicas vs. request traffic","type":"timeseries"},
+        {"datasource":{"type":"prometheus","uid":"prometheus"},"fieldConfig":{"defaults":{"unit":"percent","min":0,"max":100},"overrides":[]},"gridPos":{"h":8,"w":24,"x":0,"y":32},"id":9,"options":{"legend":{"displayMode":"list","placement":"bottom"},"tooltip":{"mode":"single"}},"targets":[{"expr":"100 * sum(rate(payments_total{app=\"transaction-service\",status=\"success\"}[5m])) / clamp_min(sum(rate(payments_total{app=\"transaction-service\"}[5m])), 1e-9)","legendFormat":"payment success %","refId":"A"}],"title":"Payment success rate","type":"timeseries"}
+      ],
+      "refresh": "15s",
+      "schemaVersion": 39,
+      "tags": ["payflux","payments"],
+      "templating": {"list": []},
+      "time": {"from":"now-1h","to":"now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "PayFlux Service Overview",
+      "uid": "payflux-overview",
+      "version": 1
+    }

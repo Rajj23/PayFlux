@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: 8089
 
 spring:
@@ -11,9 +11,6 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
-  h2:
-    console:
-      enabled: true
 
   jpa:
     hibernate:
@@ -22,7 +19,7 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
       group-id: reward-group
       auto-offset-reset: earliest
@@ -35,4 +32,15 @@ spring:
         spring.json.trusted.packages: "*"
         spring.json.add.type.headers: false
         spring.json.value.default.type: com.payflux.reward_service.entity.Transaction
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
 

@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: payflux
+
+resources:
+  - namespace.yaml
+  - config.yaml
+  - edge.yaml
+  - application-workloads.yaml
+  - transaction-hpa.yaml
+  # ServiceMonitors require the kube-prometheus-stack CRDs to be installed first.
+  - monitoring.yaml
+
+# CI can update newTag for each image (or use `kubectl set image` after render).
+# Defaults are demo tags; the corresponding tags must exist in ECR before apply.
+images:
+  - name: payflux/api-gateway
+    newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-api-gateway
+    newTag: demo
+  - name: payflux/user-service
+    newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-user-service
+    newTag: demo
+  - name: payflux/wallet-service
+    newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-wallet-service
+    newTag: demo
+  - name: payflux/transaction-service
+    newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-transaction-service
+    newTag: demo
+  - name: payflux/notification-service
+    newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-notification-service
+    newTag: demo
+  - name: payflux/reward-service
+    newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-reward-service
+    newTag: demo
+  - name: payflux/frontend
+    newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-frontend
+    newTag: demo

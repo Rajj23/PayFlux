@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import com.payflux.user_service.dto.CreateWalletRequest;
 
-@FeignClient(name = "wallet-service", url = "http://localhost:8083/api/v1/wallets")
+@FeignClient(name = "wallet-service", url = "${wallet.service.url}")
 public interface WalletClient {
 
     @PostMapping

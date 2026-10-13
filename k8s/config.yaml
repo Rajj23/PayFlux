@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payflux-config
+  namespace: payflux
+data:
+  POSTGRES_DB: payflux
+  POSTGRES_HOST: postgres
+  DB_URL: jdbc:postgresql://postgres:5432/payflux
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  USER_SERVICE_URL: http://user-service:8081
+  TRANSACTION_SERVICE_URL: http://transaction-service:8082
+  # Used by user-service and transaction-service for internal wallet calls.
+  WALLET_SERVICE_URL: http://wallet-service:8083/api/v1/wallets
+  # Gateway route target is the wallet service root; see api-gateway Deployment.
+  WALLET_GATEWAY_URL: http://wallet-service:8083
+  NOTIFICATION_SERVICE_URL: http://notification-service:8084
+  REWARD_SERVICE_URL: http://reward-service:8089
+  # Replace with the frontend origin if using a custom domain; see README.
+  FRONTEND_URL: http://payflux.example.com
+  PORT: "3000"
+  HOSTNAME: 0.0.0.0
+  # Spring Boot HTTP request duration buckets are needed for Prometheus p95 latency.
+  MANAGEMENT_METRICS_DISTRIBUTION_PERCENTILES_HISTOGRAM_HTTP_SERVER_REQUESTS: "true"

@@ -12,10 +12,15 @@ import java.util.Map;
 @Component
 public class JWTUtil {
 
-    private static final String SECRET = "secret123secret123secret123secret123secret123secret123secret123secret123secret123";
+    @org.springframework.beans.factory.annotation.Value("${jwt.secret}")
+    private String secret;
 
     private Key getSigninKey(){
-        return Keys.hmacShaKeyFor(SECRET.getBytes());
+        String effectiveSecret = (secret != null && !secret.isBlank()) ? secret : System.getenv("JWT_SECRET");
+        if (effectiveSecret == null || effectiveSecret.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET must be configured");
+        }
+        return Keys.hmacShaKeyFor(effectiveSecret.getBytes());
     }
 
     public String extractEmail(String token){

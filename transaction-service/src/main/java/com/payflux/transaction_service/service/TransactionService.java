@@ -9,4 +9,6 @@ public interface TransactionService {
     Transaction createTransaction(Transaction transaction);
 
     List<Transaction> getAllTransactions();
+
+    List<Transaction> getTransactionsByUserId(Long userId);
 }

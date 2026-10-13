@@ -7,6 +7,7 @@ public interface WalletService {
     public WalletResponse createWallet(CreateWalletRequest request);
     public WalletResponse credit(CreditRequest request);
     public WalletResponse debit(DebitRequest request);
+    public void transfer(TransferRequest request);
     public WalletResponse getWallet(Long userId);
     public HoldResponse placeHold(HoldRequest request);
     public WalletResponse captureHold(CaptureRequest request);

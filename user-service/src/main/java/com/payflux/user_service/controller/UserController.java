@@ -1,5 +1,6 @@
 package com.payflux.user_service.controller;
 
+import com.payflux.user_service.dto.UserDTO;
 import com.payflux.user_service.entity.User;
 import com.payflux.user_service.service.UserService;
 import org.springframework.http.HttpStatus;
@@ -24,12 +25,40 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable Long id){
+    public ResponseEntity<User> getUserById(@PathVariable("id") Long id) {
         return userService.getUserById(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<User>> getAllUser(){
+    public ResponseEntity<List<User>> getAllUser(
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (!"ROLE_ADMIN".equals(role)) {
+            return ResponseEntity.status(403).build();
+        }
         return ResponseEntity.ok(userService.getAllUsers());
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<UserDTO>> searchUsers(@RequestParam("q") String query) {
+        if (query == null || query.trim().length() < 2) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(userService.searchUsers(query.trim()));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<User> updateUser(
+            @PathVariable("id") Long id,
+            @RequestBody User user,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        if (headerUserId != null && !headerUserId.isBlank()) {
+            Long callerId = Long.parseLong(headerUserId);
+            if (!callerId.equals(id) && !"ROLE_ADMIN".equals(role)) {
+                return ResponseEntity.status(403).build();
+            }
+        }
+        return userService.updateUser(id, user).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    }
 }
+

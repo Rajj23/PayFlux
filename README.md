@@ -19,20 +19,16 @@
 ## Quickstart
 
 ```bash
-# 1. Start Kafka & Zookeeper
-docker-compose up
+# 1. Configure local container settings and credentials
+cp .env.example .env
+# Edit .env: set DB_PASSWORD and a random JWT_SECRET (at least 32 bytes)
 
-# 2. In separate terminals, start each service
-cd api-gateway        && mvn spring-boot:run
-cd user-service       && mvn spring-boot:run
-cd wallet-service     && mvn spring-boot:run
-cd transaction-service && mvn spring-boot:run
-cd notification-service && mvn spring-boot:run
-cd reward-service     && mvn spring-boot:run
+# 2. Build and start the complete local stack
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 ```
 
 ```bash
-# 3. Try it out (gateway on http://localhost:8080)
+# 3. Open http://localhost:3000 and try the API (gateway on http://localhost:8080)
 POST /auth/signup          # create user + wallet
 POST /auth/login           # get JWT token
 POST /api/transactions/create   # transfer money (JWT required)
@@ -104,13 +100,122 @@ Transaction Service ──[Kafka: txn-initiated]──▶ Notification + Reward 
 
 ## Running the System
 
-### 1. Start Kafka
+### Local Docker Compose
 
 ```bash
-docker-compose up
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 ```
 
-Starts **Zookeeper** (`localhost:2181`) and **Kafka** (`localhost:9092`).
+Starts the frontend, API gateway, all five domain services, PostgreSQL, Redis,
+and Kafka. PostgreSQL, Redis, and Kafka are private to the Docker network. For this
+local-only profile the gateway and frontend are bound to `127.0.0.1`.
+
+## Deploy to a single AWS server (Docker Compose)
+
+The current `terraform/infrastructure` configuration creates EKS, NAT/networking,
+managed RDS, ElastiCache, and MSK. It is not the right deployment path for an AWS
+Free-plan demo, and the existing EKS/MSK apply is expected to fail on the account
+restrictions you encountered. **Do not re-run**
+`terraform -chdir=terraform/infrastructure apply` for this server deployment.
+
+Instead, `terraform/server` provisions one Ubuntu EC2 host and no EKS cluster,
+NAT gateway, load balancer, RDS, or MSK. Docker Compose runs PostgreSQL, Redis,
+single-node Kafka, the six Spring Boot services, and the frontend on that host.
+Database/Kafka/application ports stay on the private Compose network. Port 80 is
+the public HTTP reverse proxy; port 443 is opened for optional automatic HTTPS.
+SSH is restricted to your detected IPv4 `/32`.
+
+> **This whole-stack server is billable; do not expect it to be covered by the
+> Free plan.** AWS explicitly supports some EC2 instance families on the Free plan,
+> but that does not make a server with sufficient CPU/RAM, a 40-GB disk, a public
+> IPv4 address, or all the services free. For realistic headroom, the script
+> defaults to **`t3.xlarge` (4 vCPU, 16 GiB RAM)** and lets you choose `t3.large`
+> (2 vCPU, 8 GiB) if you intentionally accept slower builds, less headroom, and
+> the possibility of memory exhaustion. Even a `t3.large` is not guaranteed to
+> run this app well. There is no micro-instance option for the full stack.
+> Check the AWS Pricing Calculator and your account's credits before confirming.
+> In us-east-1, the Linux On-Demand reference for `t3.xlarge` is approximately
+> `$0.1664/hour` (about `$121.47` for 730 hours), and `t3.large` is approximately
+> `$0.0832/hour` (about `$60.74` for 730 hours); these estimates exclude the 40-GB
+> EBS disk, public IPv4, data transfer, taxes, and applicable free-account credits.
+> T3 CPU-credit usage may incur extra charges if Unlimited mode uses surplus
+> credits. AWS pricing varies by region, account, date, and usage; verify it
+> immediately before creating resources. The provisioning script displays the
+> reference estimate and requires **two explicit confirmations** before apply.
+>
+> This is a **demo** architecture, not suitable for processing real money. Its
+> Kafka/PostgreSQL data are on a single server, Kafka is single-node PLAINTEXT,
+> there is no high availability or managed backup, and anyone can sign up via the
+> demo API. Do not expose real payment data, card information, or production
+> credentials. Add durable encrypted off-host backups and security review before
+> any production use. AWS Free plan limitations can still prevent provisioning;
+> the Terraform AWS Free Tier AMI is required and the operator must separately
+> verify that the selected EC2 size is allowed.
+
+### Launch from Windows PowerShell
+
+Prerequisites: Docker is only required if you also want to run it locally; for
+provisioning install the AWS CLI, Terraform CLI, and Windows OpenSSH Client, and
+configure AWS CLI credentials for the intended AWS account. The current CLI
+identity is shown before any Terraform plan or apply. Do not add credentials to
+the repository.
+
+From the repository root, generate a dedicated SSH key if you do not already have
+`$HOME\.ssh\payflux-server-ed25519.pub`, then **review the account, region,
+Terraform plan, EC2 reference price, and your actual AWS pricing/credits**:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\aws-server.ps1
+```
+
+The script creates `t3.xlarge` by default. To intentionally choose the smaller,
+still-billable `t3.large`, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\aws-server.ps1 -InstanceType t3.large
+```
+
+Type `YES` to review/apply the planned resources, then type `COST` to acknowledge
+that the server incurs charges. Closing the prompt, choosing anything else, a
+failed plan, or an AWS Free-plan denial will not silently bypass the checks.
+
+After the script prints the public IP, the HTTP demo opens at `http://<public-ip>`.
+For HTTPS, provide a domain whose **A record already points to the server's
+public IPv4**, and use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\aws-server.ps1 -Domain payflux.example.com
+```
+
+Replace `payflux.example.com` with your real domain. Ensure ports 80/443 are
+available so Caddy can request a TLS certificate. The app and API gateway are
+re-built and started by Docker Compose on the EC2 host; no ECR, EKS, MSK, or
+GitHub AWS secrets are needed.
+
+For a later application redeploy, SSH into the server and run:
+
+```bash
+cd /opt/payflux
+sudo env DEPLOY_PROFILE=server bash ./deploy.sh
+```
+
+With a domain configured, supply `DEPLOY_PROFILE=tls APP_DOMAIN=payflux.example.com`
+instead. View startup logs with `cd /opt/payflux && sudo docker compose --env-file deploy/server.env -f docker-compose.yml -f docker-compose.server.yml logs --follow --tail=100`.
+The persistent `deploy/server.env` contains database/JWT credentials and is mode
+`0600`; `docker-compose` database/Kafka data are stored in named volumes.
+
+To remove the AWS resources created by this **separate** server Terraform root,
+inspect the destroy plan and then explicitly confirm it (this will also delete
+the EC2 root disk and server volumes):
+
+```powershell
+terraform -chdir=terraform/server destroy -var-file=deploy/server-config.tfvars
+```
+
+Deleting an EC2 instance is separate from the existing EKS Terraform state. Do
+not run `terraform destroy` against `terraform/infrastructure` or delete shared
+resources until you have checked that root's state and the AWS console. Deleting
+server resources destroys the only copy of this demo database/Kafka data.
 
 ### 2. Start Services
 
@@ -208,6 +313,44 @@ cd reward-service       && mvn spring-boot:run
 | **Reward Service** | `RewardController` · `RewardConsumer` (Kafka) · `RewardRepository` |
 
 </details>
+
+## CI: Publish Images to Amazon ECR
+
+`.github/workflows/publish-ecr.yml` builds changed service images on pushes to
+`main`. Application changes run tests, build the frontend, and publish
+all seven service images to their Terraform-managed ECR repositories with the
+commit SHA as their tag; application or deployment-configuration changes deploy
+`./k8s` to EKS and wait for each
+application Deployment rollout. Publishing all images for an application change
+ensures every image reference in the applied Kustomize bundle exists for that
+SHA. GitHub authenticates to AWS through OIDC; no AWS access keys are stored in
+GitHub.
+
+After applying `terraform/infrastructure`, add these **repository variables**
+under GitHub repository **Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Value |
+|----------|-------|
+| `AWS_ROLE_ARN` | The value of `terraform -chdir=terraform/infrastructure output -raw github_actions_role_arn` |
+| `API_INTERNAL_URL` | Backend URL used by the frontend build-time rewrites |
+
+Terraform must be applied by an operator with AWS credentials before publishing
+and deployment can work; this provisions the OIDC role, EKS access entry, ECR
+repositories, and cluster. Apply `terraform/addons` and bootstrap the `payflux`
+namespace, application ConfigMap, and `payflux-secrets` before the first
+deployment as described in `k8s/README.md`. The namespace, ConfigMap, and Secret
+must already contain the real cluster-specific connection settings and
+credentials; CI does not create or overwrite the Secret.
+
+After a successful deploy, roll back a workload with:
+
+```bash
+kubectl rollout undo deployment/<deployment-name> -n payflux
+```
+
+For example, use `deployment/frontend` to roll back the public frontend. Each
+commit-SHA image remains in ECR, so a later workflow run can redeploy a known
+good commit as well.
 
 ---
 

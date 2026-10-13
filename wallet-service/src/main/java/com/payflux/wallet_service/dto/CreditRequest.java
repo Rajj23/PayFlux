@@ -4,6 +4,7 @@ public class CreditRequest {
     private Long userId;
     private String currency;
     private Long amount;
+    private String idempotencyKey;
 
     public Long getUserId() {
         return userId;
@@ -27,5 +28,13 @@ public class CreditRequest {
 
     public void setAmount(Long amount) {
         this.amount = amount;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 }

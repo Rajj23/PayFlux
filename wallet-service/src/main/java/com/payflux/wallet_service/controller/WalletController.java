@@ -31,7 +31,7 @@ public class WalletController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<WalletResponse> getWallet(@PathVariable Long userId){
+    public ResponseEntity<WalletResponse> getWallet(@PathVariable("userId") Long userId) {
         return ResponseEntity.ok(walletService.getWallet(userId));
     }
 
@@ -46,7 +46,7 @@ public class WalletController {
     }
 
     @PostMapping("/release/{holdReference}")
-    public ResponseEntity<HoldResponse> placeHold(@PathVariable String holdReference){
+    public ResponseEntity<HoldResponse> placeHold(@PathVariable("holdReference") String holdReference) {
         return ResponseEntity.ok(walletService.releaseHold(holdReference));
     }
 }

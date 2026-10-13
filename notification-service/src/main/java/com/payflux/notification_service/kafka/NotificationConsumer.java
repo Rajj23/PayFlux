@@ -20,21 +20,31 @@ public class NotificationConsumer {
     @KafkaListener(topics = "txn-initiated", groupId = "notification-group")
     public void consumerTransaction(Transaction transaction) {
 
-        // Notify receiver
-        Notification receiverNotification = new Notification();
-        receiverNotification.setUserId(transaction.getReceiverId());
-        receiverNotification.setMessage("₹" + transaction.getAmount() + " received from user " + transaction.getSenderId());
-        receiverNotification.setSentAt(LocalDateTime.now());
-        notificationRepository.save(receiverNotification);
-        System.out.println("Receiver notification saved:" + receiverNotification);
+        // Notify receiver (with idempotency check)
+        if (!notificationRepository.existsByTransactionIdAndUserId(transaction.getId(), transaction.getReceiverId())) {
+            Notification receiverNotification = new Notification();
+            receiverNotification.setUserId(transaction.getReceiverId());
+            receiverNotification.setTransactionId(transaction.getId());
+            receiverNotification.setMessage("₹" + transaction.getAmount() + " received from user " + transaction.getSenderId());
+            receiverNotification.setSentAt(LocalDateTime.now());
+            notificationRepository.save(receiverNotification);
+            System.out.println("Receiver notification saved:" + receiverNotification);
+        } else {
+            System.out.println("Receiver notification already exists for transaction: " + transaction.getId());
+        }
 
-        // Notify sender
-        Notification senderNotification = new Notification();
-        senderNotification.setUserId(transaction.getSenderId());
-        senderNotification.setMessage("₹" + transaction.getAmount() + " sent to user " + transaction.getReceiverId());
-        senderNotification.setSentAt(LocalDateTime.now());
-        notificationRepository.save(senderNotification);
-        System.out.println("Sender notification saved:" + senderNotification);
+        // Notify sender (with idempotency check)
+        if (!notificationRepository.existsByTransactionIdAndUserId(transaction.getId(), transaction.getSenderId())) {
+            Notification senderNotification = new Notification();
+            senderNotification.setUserId(transaction.getSenderId());
+            senderNotification.setTransactionId(transaction.getId());
+            senderNotification.setMessage("₹" + transaction.getAmount() + " sent to user " + transaction.getReceiverId());
+            senderNotification.setSentAt(LocalDateTime.now());
+            notificationRepository.save(senderNotification);
+            System.out.println("Sender notification saved:" + senderNotification);
+        } else {
+            System.out.println("Sender notification already exists for transaction: " + transaction.getId());
+        }
     }
 
 }
