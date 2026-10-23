@@ -67,6 +67,7 @@ public class TransactionServiceIntegrationTest {
 
         mockMvc.perform(post("/api/transactions/create")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("X-User-Id", "10")
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"))

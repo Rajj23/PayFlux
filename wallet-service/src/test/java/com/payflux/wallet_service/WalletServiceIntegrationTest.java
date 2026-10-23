@@ -50,7 +50,7 @@ public class WalletServiceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(100L))
                 .andExpect(jsonPath("$.currency").value("INR"))
-                .andExpect(jsonPath("$.balance").value(0));
+                .andExpect(jsonPath("$.balance").value(1000));
 
         assertEquals(1, walletRepository.findAll().size());
     }

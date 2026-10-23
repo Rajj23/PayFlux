@@ -42,6 +42,9 @@ public class TransactionServiceImplTest {
     @Test
     void testCreateTransaction_IdempotencyHit() {
         Transaction request = new Transaction();
+        request.setSenderId(1L);
+        request.setReceiverId(2L);
+        request.setAmount(50.0);
         request.setIdempotencyKey("test-key");
 
         Transaction existing = new Transaction();
@@ -92,6 +95,7 @@ public class TransactionServiceImplTest {
     void testCreateTransaction_HoldFailsAndPersistsFailure() {
         Transaction request = new Transaction();
         request.setSenderId(1L);
+        request.setReceiverId(2L);
         request.setAmount(50.0);
 
         Transaction savedInitial = new Transaction();
