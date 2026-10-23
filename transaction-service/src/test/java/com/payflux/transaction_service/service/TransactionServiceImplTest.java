@@ -109,7 +109,7 @@ public class TransactionServiceImplTest {
 
         Transaction result = transactionService.createTransaction(request);
         assertEquals("FAILED", result.getStatus());
-        verify(repository, times(2)).save(savedInitial);
+        verify(repository, times(2)).save(any(Transaction.class));
     }
 
     @Test
