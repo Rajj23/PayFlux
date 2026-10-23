@@ -1,6 +1,140 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: api-gateway
+  namespace: payflux
+  labels:
+    app: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: payflux/api-gateway:demo
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: payflux-config
+            - secretRef:
+                name: payflux-secrets
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: payflux
+  labels:
+    monitoring: payflux
+spec:
+  type: ClusterIP
+  selector:
+    app: api-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: payflux
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: payflux/frontend:demo
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: payflux-config
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: payflux
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: wallet-service
   namespace: payflux
   labels:
@@ -56,6 +190,8 @@ kind: Service
 metadata:
   name: wallet-service
   namespace: payflux
+  labels:
+    monitoring: payflux
 spec:
   type: ClusterIP
   selector:
@@ -123,6 +259,8 @@ kind: Service
 metadata:
   name: user-service
   namespace: payflux
+  labels:
+    monitoring: payflux
 spec:
   type: ClusterIP
   selector:
@@ -190,6 +328,8 @@ kind: Service
 metadata:
   name: transaction-service
   namespace: payflux
+  labels:
+    monitoring: payflux
 spec:
   type: ClusterIP
   selector:
@@ -219,11 +359,17 @@ spec:
       initContainers:
         - name: wait-for-kafka
           image: apache/kafka:4.3.1
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: payflux-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
           command:
             - /bin/sh
             - -ec
             - |
-              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --list >/dev/null 2>&1; do
                 echo "Waiting for Kafka metadata..."
                 sleep 5
               done
@@ -268,6 +414,8 @@ kind: Service
 metadata:
   name: notification-service
   namespace: payflux
+  labels:
+    monitoring: payflux
 spec:
   type: ClusterIP
   selector:
@@ -297,11 +445,17 @@ spec:
       initContainers:
         - name: wait-for-kafka
           image: apache/kafka:4.3.1
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: payflux-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
           command:
             - /bin/sh
             - -ec
             - |
-              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --list >/dev/null 2>&1; do
                 echo "Waiting for Kafka metadata..."
                 sleep 5
               done
@@ -346,6 +500,8 @@ kind: Service
 metadata:
   name: reward-service
   namespace: payflux
+  labels:
+    monitoring: payflux
 spec:
   type: ClusterIP
   selector:

@@ -2,10 +2,7 @@
 set -Eeuo pipefail
 
 APP_DIR="${APP_DIR:-/opt/payflux}"
-DEPLOY_REF="${DEPLOY_REF:-main}"
-GIT_REPOSITORY="${GIT_REPOSITORY:-https://github.com/Rajj23/PayPal-Clone.git}"
-DEPLOY_PROFILE="${DEPLOY_PROFILE:-server}"
-APP_DOMAIN="${APP_DOMAIN:-}"
+GIT_REPOSITORY="${GIT_REPOSITORY:-https://github.com/Rajj23/PayFlux.git}"
 
 log() { printf '[%s] %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -18,11 +15,9 @@ mkdir -p "$APP_DIR"
 if [[ ! -d "$APP_DIR/.git" ]]; then
   [[ ! -e "$APP_DIR/docker-compose.yml" ]] || die "$APP_DIR exists and is not a Git checkout; back it up before continuing."
   log "Cloning $GIT_REPOSITORY into $APP_DIR"
-  git clone --branch "$DEPLOY_REF" --depth 1 "$GIT_REPOSITORY" "$APP_DIR"
+  git clone --depth 1 "$GIT_REPOSITORY" "$APP_DIR"
 else
-  log "Updating application checkout in $APP_DIR"
-  git -C "$APP_DIR" fetch --depth 1 origin "$DEPLOY_REF"
-  git -C "$APP_DIR" checkout -B "$DEPLOY_REF" FETCH_HEAD
+  log "Using existing checkout in $APP_DIR"
 fi
 
 cd "$APP_DIR"
@@ -61,46 +56,21 @@ PY
 if [[ ! -f "$SERVER_ENV" ]]; then
   {
     printf 'POSTGRES_DB=payflux\nDB_USERNAME=payflux\nDB_PASSWORD=%s\n' "$(random_secret)"
-    printf 'DB_URL=jdbc:postgresql://postgres:5432/payflux\nJWT_SECRET=%s\n' "$(random_secret)"
-    printf 'REDIS_HOST=redis\nREDIS_PORT=6379\nKAFKA_BOOTSTRAP_SERVERS=kafka:9092\n'
-    printf 'USER_SERVICE_URL=http://user-service:8081\n'
-    printf 'TRANSACTION_SERVICE_URL=http://transaction-service:8082\n'
-    printf 'WALLET_SERVICE_URL=http://wallet-service:8083/api/v1/wallets\n'
-    printf 'WALLET_GATEWAY_URL=http://wallet-service:8083\n'
-    printf 'NOTIFICATION_SERVICE_URL=http://notification-service:8084\n'
-    printf 'REWARD_SERVICE_URL=http://reward-service:8089\n'
-    printf 'FRONTEND_URL=http://localhost\nAPI_INTERNAL_URL=http://api-gateway:8080\n'
-    printf 'DB_POOL_SIZE=5\nDB_POOL_MINIMUM_IDLE=1\n'
-    printf 'JAVA_TOOL_OPTIONS=-Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m\n'
+    printf 'KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092\nDATA_BIND_ADDRESS=0.0.0.0\n'
     printf 'KAFKA_HEAP_OPTS=-Xms128m -Xmx384m\n'
-    printf 'POSTGRES_MEMORY_LIMIT=384m\nREDIS_MEMORY_LIMIT=128m\nKAFKA_MEMORY_LIMIT=512m\n'
-    printf 'SERVICE_MEMORY_LIMIT=512m\nFRONTEND_MEMORY_LIMIT=384m\nPROXY_MEMORY_LIMIT=64m\n'
   } > "$SERVER_ENV"
-  log "Created generated application secrets in $SERVER_ENV"
+  log "Created generated data-service credentials in $SERVER_ENV"
 fi
 chmod 600 "$SERVER_ENV"
 
-if [[ "$DEPLOY_PROFILE" == "tls" ]]; then
-  [[ -n "$APP_DOMAIN" ]] || die 'Set APP_DOMAIN to a domain pointing to this server before enabling HTTPS.'
-  set_server_env APP_DOMAIN "$APP_DOMAIN"
-  set_server_env FRONTEND_URL "https://$APP_DOMAIN"
-  log "Deploying PayFlux at https://$APP_DOMAIN"
-  docker compose --env-file "$SERVER_ENV" --profile tls -f docker-compose.yml -f docker-compose.server.yml -f docker-compose.tls.yml config --quiet
-  docker compose --env-file "$SERVER_ENV" --profile tls --parallel 2 -f docker-compose.yml -f docker-compose.server.yml -f docker-compose.tls.yml up --detach --build --remove-orphans
-  docker compose --env-file "$SERVER_ENV" --profile tls -f docker-compose.yml -f docker-compose.server.yml -f docker-compose.tls.yml ps
-  DEPLOY_URL="https://$APP_DOMAIN"
-elif [[ "$DEPLOY_PROFILE" == "server" ]]; then
-  log 'Deploying the HTTP server preview. Set DEPLOY_PROFILE=tls and APP_DOMAIN for HTTPS.'
-  PUBLIC_IP="$(curl --fail --silent --show-error --max-time 5 https://checkip.amazonaws.com || true)"
-  [[ "$PUBLIC_IP" =~ ^[0-9.]+$ ]] || die 'Unable to detect the server public IPv4; retry or configure it manually.'
-  set_server_env FRONTEND_URL "http://$PUBLIC_IP"
-  docker compose --env-file "$SERVER_ENV" --profile server -f docker-compose.yml -f docker-compose.server.yml config --quiet
-  docker compose --env-file "$SERVER_ENV" --profile server --parallel 2 -f docker-compose.yml -f docker-compose.server.yml up --detach --build --remove-orphans
-  docker compose --env-file "$SERVER_ENV" --profile server -f docker-compose.yml -f docker-compose.server.yml ps
-  DEPLOY_URL="http://$PUBLIC_IP"
-else
-  die "DEPLOY_PROFILE must be 'server' or 'tls', not '$DEPLOY_PROFILE'."
-fi
+PRIVATE_IP="$(hostname -I | awk '{print $1}')"
+[[ "$PRIVATE_IP" =~ ^[0-9.]+$ ]] || die 'Unable to detect the EC2 private IPv4.'
+set_server_env KAFKA_ADVERTISED_LISTENERS "PLAINTEXT://$PRIVATE_IP:9092"
+set_server_env DATA_BIND_ADDRESS "0.0.0.0"
+log "Deploying the EC2 data host at $PRIVATE_IP. Application workloads run in EKS."
+docker compose --env-file "$SERVER_ENV" -f docker-compose.data.yml config --quiet
+docker compose --env-file "$SERVER_ENV" --parallel 2 -f docker-compose.data.yml up --detach
+docker compose --env-file "$SERVER_ENV" -f docker-compose.data.yml ps
 
-log "Deployment finished: $DEPLOY_URL"
-log "Logs: cd $APP_DIR && sudo docker compose --env-file deploy/server.env -f docker-compose.yml -f docker-compose.server.yml logs --follow --tail=100"
+log "Deployment finished: data services on $PRIVATE_IP"
+log "Logs: cd $APP_DIR && sudo docker compose --env-file deploy/server.env -f docker-compose.data.yml logs --follow"

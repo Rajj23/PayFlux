@@ -102,6 +102,10 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return admin;
         }
 
+        if (path.equals("/api/transactions/create")) {
+            return method == HttpMethod.POST;
+        }
+
         if (path.startsWith("/api/transactions/user/")) {
             return admin || path.equals("/api/transactions/user/" + userId);
         }

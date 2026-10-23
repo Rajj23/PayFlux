@@ -1,11 +1,10 @@
 [CmdletBinding()]
 param(
     [string]$Region = "us-east-1",
-    [ValidateSet("t3.large", "t3.xlarge", "t3.2xlarge")]
-    [string]$InstanceType = "t3.xlarge",
+    [ValidateSet("m7i-flex.large")]
+    [string]$InstanceType = "m7i-flex.large",
     [string]$SshCidr,
-    [string]$PublicKeyPath = "$HOME\.ssh\payflux-server-ed25519.pub",
-    [string]$Domain = ""
+    [string]$PublicKeyPath = "$HOME\.ssh\payflux-server-ed25519.pub"
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,8 +39,7 @@ Require-Command "ssh-keygen"
 $Identity = aws sts get-caller-identity --output json | ConvertFrom-Json
 if (-not $Identity.Account) { throw "AWS CLI could not retrieve the configured account identity." }
 Write-Host "Using AWS account $($Identity.Account), region $Region"
-Write-Host "AWS Free plan can restrict this launch. AWS Free plan also does not include MSK; this deployment runs Kafka locally in Docker."
-Write-Host "The selected $InstanceType EC2 instance and storage are billable. Confirm the expected cost before continuing."
+Write-Host "The selected EC2 host runs Kafka, PostgreSQL, and Redis for the EKS workloads."
 
 if (-not (Test-Path $PublicKeyPath)) {
     New-Item -ItemType Directory -Force -Path (Split-Path $PublicKeyPath) | Out-Null
@@ -89,9 +87,7 @@ try {
     if ($Confirm -cne "YES") { throw "Cancelled. No infrastructure has been applied." }
 
 $ExpectedInstanceHourly = switch ($InstanceType) {
-    "t3.large" { 0.0832 }
-    "t3.xlarge" { 0.1664 }
-    "t3.2xlarge" { 0.3328 }
+    "m7i-flex.large" { 0.1008 }
 }
 Write-Host ("Published us-east-1 Linux On-Demand reference for {0}: ${1:N4}/hour, roughly ${2:N2} per 730-hour month before disk, public IPv4, data, taxes, and any Free-plan credits. Verify account pricing and credits first." -f $InstanceType, $ExpectedInstanceHourly, ($ExpectedInstanceHourly * 730))
 $FinalCostConfirm = Read-Host "This plan launches a billed $InstanceType server. Type COST to acknowledge and continue"
@@ -103,36 +99,8 @@ if ($FinalCostConfirm -cne "COST") { throw "Cancelled. No infrastructure has bee
     $ServerIp = terraform output -raw server_public_ip
     if ($LASTEXITCODE -ne 0) { throw "Failed to read Terraform server_public_ip output." }
 
-    $RepoUrl = "https://github.com/Rajj23/PayPal-Clone.git"
-    Write-Host "Waiting for the server to finish installing Docker (up to 10 minutes)..."
-    $Ready = $false
-    for ($Attempt = 0; $Attempt -lt 30; $Attempt++) {
-        try {
-            $null = ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -i $PrivateKeyPath "ubuntu@$ServerIp" "sudo test -x /usr/bin/docker && docker compose version >/dev/null"
-            if ($LASTEXITCODE -eq 0) { $Ready = $true; break }
-        } catch { }
-        Start-Sleep -Seconds 20
-    }
-    if (-not $Ready) {
-        throw "Server created at $ServerIp, but Docker did not become available in time. Check cloud-init at /var/log/cloud-init-output.log; do not run terraform apply again."
-    }
-
-    # Bootstrap script creates /opt/payflux for ubuntu. Clone as ubuntu to keep
-    # the checkout writable by the SSH user and preserve the private server env.
-    $null = ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i $PrivateKeyPath "ubuntu@$ServerIp" "git clone --branch main --depth 1 '$RepoUrl' /opt/payflux"
-    if ($LASTEXITCODE -ne 0) { throw "Remote source checkout failed. The server is still available at $ServerIp; inspect it before retrying." }
-    $DomainArgs = ""
-    if ($Domain) {
-        Write-Host "Point DNS A record $Domain to $ServerIp before automatic TLS provisioning."
-        $DomainArgs = "DEPLOY_PROFILE=tls APP_DOMAIN='$Domain'"
-    }
-    $RemoteCommand = "sudo env $DomainArgs bash /opt/payflux/deploy.sh"
-    $null = ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i $PrivateKeyPath "ubuntu@$ServerIp" $RemoteCommand
-    if ($LASTEXITCODE -ne 0) { throw "App deploy failed. SSH to $ServerIp and inspect /opt/payflux logs before retrying." }
-
-    Write-Host "PayFlux is deployed. Server IP: $ServerIp"
-    if ($Domain) { Write-Host "Application URL: https://$Domain" }
-    else { Write-Host "Application URL: http://$ServerIp" }
+    Write-Host "Infrastructure is ready. Start the EC2 data services with deploy.sh, then apply k8s/ after publishing GHCR images."
+    Write-Host "Server public IP: $ServerIp"
     Write-Host "Private SSH key: $PrivateKeyPath"
     Write-Host "Keep that key secret. To remove infrastructure later, inspect the plan and run: terraform -chdir=terraform/server destroy -var-file='$VarFile'"
 }

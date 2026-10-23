@@ -375,7 +375,7 @@ const MyProfile = () => {
             <div className="tab-content">
               <div className="content-header">
                 <h2>Preferences</h2>
-                <p>Customize your PayFlow experience</p>
+                <p>Customize your PayFlux experience</p>
               </div>
 
               <div className="preferences-settings">
@@ -404,7 +404,7 @@ const MyProfile = () => {
                 <div className="preference-item">
                   <div className="preference-info">
                     <h4>Marketing Emails</h4>
-                    <p>Receive offers and promotions from PayFlow</p>
+                    <p>Receive offers and promotions from PayFlux</p>
                   </div>
                   <label className="toggle-switch">
                     <input type="checkbox" />

@@ -67,6 +67,24 @@ class JwtAuthFilterTest {
     }
 
     @Test
+    void allowsAuthenticatedUsersToCreateTransactions() {
+        Claims claims = claims("42", "ROLE_USER");
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/transactions/create")
+                        .header("Authorization", "Bearer valid-test-token")
+                        .build());
+        when(chain.filter(org.mockito.ArgumentMatchers.any(ServerWebExchange.class))).thenReturn(Mono.empty());
+
+        try (var jwtUtil = mockStatic(JWTUtil.class)) {
+            jwtUtil.when(() -> JWTUtil.validateToken("valid-test-token")).thenReturn(claims);
+            filter.filter(exchange, chain).block();
+        }
+
+        verify(chain).filter(org.mockito.ArgumentMatchers.any(ServerWebExchange.class));
+    }
+
+    @Test
     void rejectsRequestsForAnotherUsersData() {
         Claims claims = claims("42", "ROLE_USER");
         GatewayFilterChain chain = mock(GatewayFilterChain.class);

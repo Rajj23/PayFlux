@@ -68,6 +68,12 @@ const AddFunds = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    showError(
+      'Signup Bonus',
+      'New INR accounts receive a one-time ₹1,000 signup bonus. Direct wallet credits are restricted for account safety.'
+    );
+    return;
+
     setLoading(true);
     setMessage('');
 

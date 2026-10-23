@@ -14,19 +14,19 @@ provider "aws" {
 }
 
 variable "aws_region" {
-  description = "AWS Region where the single EC2 application server will be created."
+  description = "AWS Region for the EC2 data host and EKS cluster."
   type        = string
   default     = "us-east-1"
 }
 
 variable "instance_type" {
-  description = "The EC2 instance size. The six Java services plus Kafka require substantially more than a micro instance. This instance incurs EC2 charges."
+  description = "The EC2 data host size."
   type        = string
-  default     = "t3.xlarge"
+  default     = "m7i-flex.large"
 
   validation {
-    condition     = contains(["t3.large", "t3.xlarge", "t3.2xlarge"], var.instance_type)
-    error_message = "Choose an explicitly supported t3.large, t3.xlarge, or t3.2xlarge; a micro instance cannot run the full PayFlux stack."
+    condition     = contains(["m7i-flex.large"], var.instance_type)
+    error_message = "The supported PayFlux data host is m7i-flex.large."
   }
 }
 
@@ -96,6 +96,20 @@ resource "aws_subnet" "public" {
   tags = { Name = "payflux-server-public" }
 }
 
+resource "aws_subnet" "public_secondary" {
+  vpc_id                  = aws_vpc.server.id
+  cidr_block              = "10.31.2.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[1]
+  map_public_ip_on_launch = true
+
+  tags = { Name = "payflux-server-public-secondary" }
+}
+
+resource "aws_route_table_association" "public_secondary" {
+  subnet_id      = aws_subnet.public_secondary.id
+  route_table_id = aws_route_table.public.id
+}
+
 resource "aws_internet_gateway" "server" {
   vpc_id = aws_vpc.server.id
 
@@ -140,11 +154,35 @@ resource "aws_security_group" "server" {
   }
 
   ingress {
-    description = "SSH from the operator's fixed public IPv4 only"
+    description = "SSH from the operators fixed public IPv4 only"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.ssh_cidr]
+  }
+
+  ingress {
+    description = "PostgreSQL from EKS nodes"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["10.31.0.0/16"]
+  }
+
+  ingress {
+    description = "Redis from EKS nodes"
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = ["10.31.0.0/16"]
+  }
+
+  ingress {
+    description = "Kafka from EKS nodes"
+    from_port   = 9092
+    to_port     = 9092
+    protocol    = "tcp"
+    cidr_blocks = ["10.31.0.0/16"]
   }
 
   egress {
@@ -172,7 +210,7 @@ resource "aws_instance" "server" {
   key_name                    = aws_key_pair.server.key_name
   associate_public_ip_address = true
   monitoring                  = false
-  user_data_replace_on_change = false
+  user_data_replace_on_change = true
 
   root_block_device {
     volume_type           = "gp3"
@@ -205,8 +243,7 @@ resource "aws_instance" "server" {
 
     systemctl enable --now docker
 
-    # Configure a modest swap file for build-time memory spikes; Docker builds
-    # are performed on the server so application deploys need not use ECR.
+    # Keep Kafka and the data containers stable on the small data host.
     fallocate -l 4G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=4096
     chmod 600 /swapfile
     mkswap /swapfile
@@ -219,7 +256,9 @@ resource "aws_instance" "server" {
     # ports can bypass UFW on Ubuntu, so EC2 security-group rules are decisive.
     ufw default deny incoming
     ufw default allow outgoing
-    ufw allow from ${var.ssh_cidr} to any port 22 proto tcp
+    # The EC2 security group restricts SSH to var.ssh_cidr. Keeping the host
+    # firewall open for port 22 avoids stale rules after a public IP changes.
+    ufw allow 22/tcp
     ufw allow 80/tcp
     ufw allow 443/tcp
     ufw --force enable
@@ -234,18 +273,46 @@ resource "aws_instance" "server" {
 
 }
 
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = "payflux-cluster"
+  cluster_version = "1.35"
+
+  vpc_id                   = aws_vpc.server.id
+  subnet_ids               = [aws_subnet.public.id, aws_subnet.public_secondary.id]
+  control_plane_subnet_ids = [aws_subnet.public.id, aws_subnet.public_secondary.id]
+
+  cluster_endpoint_public_access           = true
+  enable_irsa                              = true
+  enable_cluster_creator_admin_permissions = true
+
+  eks_managed_node_groups = {
+    payflux = {
+      min_size       = 1
+      max_size       = 2
+      desired_size   = 1
+      instance_types = ["m7i-flex.large"]
+      capacity_type  = "ON_DEMAND"
+    }
+  }
+
+  depends_on = [aws_instance.server]
+}
+
 output "server_instance_id" {
-  description = "EC2 instance ID for the PayFlux Docker Compose server."
+  description = "EC2 instance ID for the PayFlux data host."
   value       = aws_instance.server.id
 }
 
 output "server_public_ip" {
-  description = "Public IPv4 address. Point your A record here, then use http://IP until DNS is ready."
+  description = "Public IPv4 address for SSH administration."
   value       = aws_instance.server.public_ip
 }
 
 output "server_ssh_command" {
-  description = "SSH command to connect to the Ubuntu EC2 instance."
+  description = "SSH command to connect to the EC2 data host."
   value       = "ssh -i <PRIVATE_KEY.pem> ubuntu@${aws_instance.server.public_ip}"
 }
 
@@ -259,4 +326,17 @@ output "server_region" {
 
 output "server_storage_gb" {
   value = 40
+}
+
+output "server_private_ip" {
+  description = "Private IP used by EKS to reach the EC2 data services."
+  value       = aws_instance.server.private_ip
+}
+
+output "cluster_name" {
+  value = module.eks.cluster_name
+}
+
+output "cluster_region" {
+  value = var.aws_region
 }

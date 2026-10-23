@@ -81,6 +81,10 @@ spring:
                 redis-rate-limiter.burstCapacity: 20
                 redis-rate-limiter.requestedToken: 1
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   endpoints:
     web:
       exposure:
@@ -89,4 +93,3 @@ management:
     health:
       probes:
         enabled: true
-

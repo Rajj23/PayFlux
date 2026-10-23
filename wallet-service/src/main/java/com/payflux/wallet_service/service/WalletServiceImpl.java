@@ -31,6 +31,8 @@ import jakarta.transaction.Transactional;
 @Service
 public class WalletServiceImpl implements WalletService{
 
+    private static final long SIGNUP_BONUS_INR = 1_000L;
+
     private final WalletRepository walletRepository;
     private final WalletHoldRepository walletHoldRepository;
     private final TransactionRepository transactionRepository;
@@ -60,7 +62,16 @@ public class WalletServiceImpl implements WalletService{
         }
 
         Wallet wallet = new Wallet(request.getUserId(), request.getCurrency());
+        if ("INR".equalsIgnoreCase(request.getCurrency())) {
+            wallet.setBalance(SIGNUP_BONUS_INR);
+            wallet.setAvailableBalance(SIGNUP_BONUS_INR);
+        }
         Wallet saved = walletRepository.save(wallet);
+        if ("INR".equalsIgnoreCase(request.getCurrency())) {
+            transactionRepository.save(
+                    new Transaction(saved.getId(), "CREDIT", SIGNUP_BONUS_INR, "SUCCESS")
+            );
+        }
         return new WalletResponse(
                 saved.getId(), saved.getUserId(), saved.getCurrency(),
                 saved.getBalance(), saved.getAvailableBalance()

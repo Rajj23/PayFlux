@@ -33,6 +33,10 @@ wallet:
   service:
     url: ${WALLET_SERVICE_URL}
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   endpoints:
     web:
       exposure:
@@ -41,4 +45,3 @@ management:
     health:
       probes:
         enabled: true
-

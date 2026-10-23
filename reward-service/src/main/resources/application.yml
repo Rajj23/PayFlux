@@ -35,6 +35,10 @@ spring:
 
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   endpoints:
     web:
       exposure:
@@ -43,4 +47,3 @@ management:
     health:
       probes:
         enabled: true
-

@@ -169,7 +169,7 @@ const Dashboard = () => {
           
           // Show browser notification
           if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('PayFlow - New Notification', {
+            new Notification('PayFlux - New Notification', {
               body: latestNotification.message,
               icon: '/logo.png',
               badge: '/logo.png'
@@ -274,7 +274,7 @@ const Dashboard = () => {
 
   const isSentTransaction = (transaction) => {
     if (!user) return false;
-    return transaction.senderId === user.id;
+    return String(transaction.senderId) === String(user.id);
   };
 
   if (loading) {
@@ -329,10 +329,10 @@ const Dashboard = () => {
           <h2>
             <img 
               src="/assets/logo.png" 
-              alt="PayFlow Logo" 
+              alt="PayFlux Logo"
               className="brand-logo" 
             />
-            PayFlow
+            PayFlux
           </h2>
         </div>
 

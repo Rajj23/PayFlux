@@ -113,7 +113,7 @@ const Transactions = () => {
   };
   const isSentTransaction = (transaction) => {
     const currentUserId = getCurrentUserId();
-    return transaction.senderId === currentUserId;
+    return String(transaction.senderId) === String(currentUserId);
   };
 
   const getUserEmail = (userId) => {

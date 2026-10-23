@@ -6,33 +6,29 @@ namespace: payflux
 resources:
   - namespace.yaml
   - config.yaml
-  - edge.yaml
   - application-workloads.yaml
-  - transaction-hpa.yaml
-  # ServiceMonitors require the kube-prometheus-stack CRDs to be installed first.
   - monitoring.yaml
 
-# CI can update newTag for each image (or use `kubectl set image` after render).
-# Defaults are demo tags; the corresponding tags must exist in ECR before apply.
+# Images are published to ECR by the server-side deployment process.
 images:
   - name: payflux/api-gateway
     newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-api-gateway
-    newTag: demo
+    newTag: eks-20261022053716
   - name: payflux/user-service
     newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-user-service
-    newTag: demo
+    newTag: eks-20261022053719
   - name: payflux/wallet-service
     newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-wallet-service
-    newTag: demo
+    newTag: eks-20261022053722
   - name: payflux/transaction-service
     newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-transaction-service
-    newTag: demo
+    newTag: eks-20261022053725
   - name: payflux/notification-service
     newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-notification-service
-    newTag: demo
+    newTag: eks-20261022053729
   - name: payflux/reward-service
     newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-reward-service
-    newTag: demo
+    newTag: eks-20261022053732
   - name: payflux/frontend
     newName: 313694531077.dkr.ecr.us-east-1.amazonaws.com/payflux-frontend
-    newTag: demo
+    newTag: eks-20261022065352

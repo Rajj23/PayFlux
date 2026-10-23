@@ -231,7 +231,7 @@ const SendMoney = () => {
   const isSentTransaction = (transaction) => {
     const tokenPayload = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
     const currentUserId = tokenPayload.userId;
-    return transaction.senderId === parseInt(currentUserId);
+    return String(transaction.senderId) === String(currentUserId);
   };
 
   return (

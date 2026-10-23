@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../config/api';
 
 
 const Header = ({ 
-  title = "PayFlow", 
+  title = "PayFlux",
   subtitle, 
   showUser = true, 
   showNotifications = true,

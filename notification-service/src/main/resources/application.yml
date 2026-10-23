@@ -34,6 +34,10 @@ spring:
         spring.json.value.default.type: com.payflux.notification_service.entity.Transaction
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   endpoints:
     web:
       exposure:
@@ -42,4 +46,3 @@ management:
     health:
       probes:
         enabled: true
-
